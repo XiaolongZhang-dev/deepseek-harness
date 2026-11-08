@@ -72,8 +72,10 @@ function TagEditorForm({ request, state, close, save, t }: {
       setError(t('editor.limit', { max: TAGS_PER_WORKSPACE_MAX }))
       return
     }
-    if (vocabulary.some(tag => tagKey(tag) === tagKey(normalized)) && vocabulary.length >= TAGS_TOTAL_MAX
-      && !draft.some(tag => tagKey(tag) === tagKey(normalized))) {
+    // The global cap counts the vocabulary, so only a NEW tag can exceed it;
+    // attaching an existing tag to another Workspace adds no vocabulary entry.
+    const known = vocabulary.some(tag => tagKey(tag) === tagKey(normalized))
+    if (!known && vocabulary.length >= TAGS_TOTAL_MAX) {
       setError(t('editor.limit', { max: TAGS_TOTAL_MAX }))
       return
     }
@@ -88,7 +90,8 @@ function TagEditorForm({ request, state, close, save, t }: {
   }
 
   const confirm = (): void => {
-    if (saving) return
+    // The footer button is disabled while a save is in flight, so this is the
+    // only entry point and needs no second guard.
     setSaving(true)
     setError(null)
     save(request.workspaceId, draft).then(() => {
@@ -111,7 +114,7 @@ function TagEditorForm({ request, state, close, save, t }: {
     <Modal
       open
       onClose={close}
-      className={dialogCss.wide ?? ''}
+      className={dialogCss.wide as string}
       title={t('editor.title')}
       description={request.displayTitle}
       closeLabel={t('editor.close')}

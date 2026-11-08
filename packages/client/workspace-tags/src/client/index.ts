@@ -12,7 +12,6 @@
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 // Type-only: pulls the generated `remote.settings` namespace and `ctx.remote`.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
@@ -35,7 +34,7 @@ import { TagEditorDialog } from './TagEditor.tsx'
 import { TagManagerDialog } from './TagManager.tsx'
 import { WorkspaceTagChips } from './WorkspaceTagChips.tsx'
 import type { TagEditorInjected, TagManagerInjected, TagsInjected } from './slots.ts'
-import { EMPTY_TAGS_STATE, type WorkspaceTagsState } from './state.ts'
+import { createTagsStore, type WorkspaceTagsState } from './state.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -54,7 +53,7 @@ export const inject = ['slots', 'locale', 'contextMenus', 'remote', 'remote.sett
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'workspace-tags: dictionaries')
   const t = ctx.locale.bind(NS)
-  const store = createSnapshotStore<WorkspaceTagsState>(EMPTY_TAGS_STATE)
+  const store = createTagsStore()
   const update = (patch: Partial<WorkspaceTagsState>): void => {
     store.set({ ...store.getSnapshot(), ...patch })
   }

@@ -87,7 +87,7 @@ function ManagerBody({ state, close, save, t }: {
         seen.add(key)
         names.push(candidate)
       }
-      if (names.length > 0) next[workspaceId] = names
+      next[workspaceId] = names
     }
     rewrite(next)
   }
@@ -107,7 +107,7 @@ function ManagerBody({ state, close, save, t }: {
     <Modal
       open
       onClose={close}
-      className={dialogCss.wide ?? ''}
+      className={dialogCss.wide as string}
       title={t('manager.title')}
       description={t('manager.hint')}
       closeLabel={t('editor.close')}
@@ -124,7 +124,7 @@ function ManagerBody({ state, close, save, t }: {
                     ? (
                       <>
                         <Input
-                          className={css.renameInput ?? ''}
+                          className={css.renameInput as string}
                           value={draft}
                           aria-label={t('manager.rename')}
                           onChange={(event) => { setDraft(event.target.value); setError(null) }}
