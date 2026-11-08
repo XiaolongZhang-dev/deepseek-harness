@@ -117,6 +117,8 @@ describe('workspace-tags browser plugin', () => {
     const tagRow = latest.items().find(row => row.label === '前端')
     expect(tagRow).toBeDefined()
     expect(tagRow?.selected).toBe(false)
+    // No tag selected yet: the ungrouped bucket keeps its native behavior.
+    expect(latest.matchesUngrouped?.()).toBe(true)
 
     // Selecting publishes another identity; the newest predicate accepts only
     // the tagged Workspace.
@@ -125,6 +127,9 @@ describe('workspace-tags browser plugin', () => {
     const current = b.filters.source.getSnapshot()[0]!
     expect(current).not.toBe(latest)
     expect(current.items().find(row => row.label === '前端')?.selected).toBe(true)
+    // A tag filter narrows to tagged Workspaces, which an ungrouped Session
+    // can never be, so its bucket disappears while the filter is active.
+    expect(current.matchesUngrouped?.()).toBe(false)
     expect(current.matches({
       workspaceId: 'w1', path: '/w1', title: 'w1', sessionIds: [], createdAt: '0', updatedAt: '0',
     } as never)).toBe(true)

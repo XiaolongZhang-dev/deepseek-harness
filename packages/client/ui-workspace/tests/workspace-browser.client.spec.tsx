@@ -808,6 +808,33 @@ describe('WorkspaceBrowser', () => {
     expect(requestSessionRename).toHaveBeenCalledTimes(2)
   })
 
+  it('drops filtered-out Workspace groups and the ungrouped bucket without leaking their Sessions', () => {
+    const filters = [{
+      id: 'only-tagged',
+      label: 'tagged',
+      items: () => [],
+      matches: (candidate: WorkspaceView) => candidate.workspaceId === wid('tagged'),
+      matchesUngrouped: () => false,
+    }]
+    mount({
+      useViewFilters: select => select(filters),
+      useSessions: hook(sessionState([
+        summary('kept-s', 1), summary('hidden-s', 2), summary('loose-s', 3),
+      ])),
+      useWorkspaces: hook(workspaceState([
+        workspace('tagged', ['kept-s']),
+        workspace('other', ['hidden-s']),
+      ])),
+    })
+    expect(screen.getByText('tagged')).toBeDefined()
+    // The filtered-out Workspace is gone, and its Sessions are accounted to it
+    // rather than resurfacing under the ungrouped bucket.
+    expect(screen.queryByText('other')).toBeNull()
+    expect(screen.queryByText('未分组')).toBeNull()
+    expect(screen.queryByText('hidden-s')).toBeNull()
+    expect(screen.queryByText('loose-s')).toBeNull()
+  })
+
   it('renders row actions inline while Session menus belong to the global overlay', () => {
     const rendered = vi.fn()
     const renderSlot: WorkspaceBrowserProps['renderSlot'] = (name: string, owner: object) => {

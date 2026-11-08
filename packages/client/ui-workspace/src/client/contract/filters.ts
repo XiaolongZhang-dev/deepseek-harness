@@ -48,6 +48,12 @@ export interface WorkspaceViewFilter {
   readonly items: () => readonly WorkspaceViewFilterItem[]
   /** Whether one Workspace stays visible; every registered filter must accept it. */
   readonly matches: (workspace: WorkspaceView) => boolean
+  /**
+   * Whether the browser's ungrouped bucket (Sessions that belong to no
+   * registered Workspace) stays visible. Omitted means always visible; a
+   * filter that narrows to tagged Workspaces should hide it while active.
+   */
+  readonly matchesUngrouped?: () => boolean
 }
 
 declare module '@deepseek-ai/cordis' {

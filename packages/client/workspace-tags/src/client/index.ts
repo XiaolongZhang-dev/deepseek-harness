@@ -173,6 +173,9 @@ export function apply(ctx: ClientContext): void {
     order: 100,
     items: filterItems,
     matches,
+    // Ungrouped Sessions belong to no Workspace, so they can never carry a
+    // tag; hide the bucket while the filter narrows the list.
+    matchesUngrouped: () => store.getSnapshot().selected.length === 0,
   })
   ctx.effect(() => {
     let dispose = registerFilter()

@@ -327,6 +327,10 @@ type SessionTreeProps = Pick<
   home?: string | undefined
   /** Workspaces in Host group order with browser-projected Session order. */
   workspaces: readonly WorkspaceView[]
+  /** Workspace ids the active view filters hide; their Sessions stay accounted to them. */
+  hiddenWorkspaceIds: ReadonlySet<string>
+  /** Whether the ungrouped bucket survives the active view filters. */
+  ungroupedVisible: boolean
   /** Browser-projected order for Sessions outside every Workspace. */
   ungroupedSessionIds: readonly SessionId[]
   /** Whether the current Workspace stream has a complete Host baseline. */
@@ -371,7 +375,7 @@ function EmptySessions({ rowState, onLeaveArchivedOnly, t }: Pick<SessionTreePro
 
 /** The scrolling session tree; unmounting drops the sessions subscription and the session watermarks. */
 function SessionTree({
-  list, useSessionStatus, startSession, open, workspaces, ungroupedSessionIds,
+  list, useSessionStatus, startSession, open, workspaces, ungroupedSessionIds, hiddenWorkspaceIds, ungroupedVisible,
   rowState, onLeaveArchivedOnly,
   workspaceReady, animationResetKey, usePanelInfo, useRemoteAccess, useSessionAccess, useWorkspaceAccess,
   onSessionRenameRequest,
@@ -432,8 +436,8 @@ function SessionTree({
     () => deriveGroups(list, workspaces, rowState, statuses, {
       expandedGroups,
       ungroupedOrder: ungroupedSessionIds,
-    }),
-    [list, workspaces, rowState, statuses, expandedGroups, ungroupedSessionIds],
+    }).filter(group => group.key === UNGROUPED_KEY ? ungroupedVisible : !hiddenWorkspaceIds.has(group.key)),
+    [list, workspaces, rowState, statuses, expandedGroups, ungroupedSessionIds, hiddenWorkspaceIds, ungroupedVisible],
   )
   useEffect(() => {
     for (let key = revealGroup; key !== undefined; key = parents.get(key)) {
@@ -1001,18 +1005,28 @@ export function WorkspaceBrowser({
   // The resolved name, not `t`, is the memo dependency: the bound seat keeps
   // its identity across a language switch.
   const defaultWorkspaceName = t('workspace.defaultName')
-  // Every registered filter must accept a Workspace for it to stay visible;
-  // the ungrouped bucket has no Workspace and is never filtered.
+  // Every registered filter must accept a Workspace for it to stay visible.
+  // The tree is still derived from every Workspace so a filtered-out
+  // Workspace's Sessions stay accounted to it instead of surfacing under the
+  // ungrouped bucket; only its group is dropped at render time.
   const visibleWorkspaces = useMemo(
     () => storedWorkspaces.filter(workspace => viewFilters.every(filter => filter.matches(workspace))),
     [storedWorkspaces, viewFilters],
   )
+  const hiddenWorkspaceIds = useMemo(() => {
+    const visible = new Set<string>(visibleWorkspaces.map(workspace => workspace.workspaceId))
+    return new Set<string>(storedWorkspaces.map(workspace => workspace.workspaceId).filter(id => !visible.has(id)))
+  }, [storedWorkspaces, visibleWorkspaces])
+  const ungroupedVisible = useMemo(
+    () => viewFilters.every(filter => filter.matchesUngrouped?.() ?? true),
+    [viewFilters],
+  )
   const workspaces = useMemo(
-    () => visibleWorkspaces.map(workspace => ({
+    () => storedWorkspaces.map(workspace => ({
       ...workspace,
       title: workspaceDisplayTitle(workspace.title, defaultWorkspaceName),
     })),
-    [visibleWorkspaces, defaultWorkspaceName],
+    [storedWorkspaces, defaultWorkspaceName],
   )
   const workspacePhase = useWorkspaces(state => state.phase)
   const workspaceStreamState = useWorkspaces(state => state.state)
@@ -1058,11 +1072,16 @@ export function WorkspaceBrowser({
   )
   const flatMemberIds = useMemo(() => {
     const memberIds = sessionMemberIds(list)
-    if (viewFilters.length === 0) return memberIds
-    const visible = new Set(visibleWorkspaces.flatMap(workspace => workspace.sessionIds))
-    const accounted = new Set(storedWorkspaces.flatMap(workspace => workspace.sessionIds))
-    return memberIds.filter(id => visible.has(id) || !accounted.has(id))
-  }, [list, viewFilters, visibleWorkspaces, storedWorkspaces])
+    if (hiddenWorkspaceIds.size === 0 && ungroupedVisible) return memberIds
+    const owner = new Map<string, string>()
+    for (const workspace of storedWorkspaces) {
+      for (const id of workspace.sessionIds) owner.set(id, workspace.workspaceId)
+    }
+    return memberIds.filter((id) => {
+      const workspaceId = owner.get(id)
+      return workspaceId === undefined ? ungroupedVisible : !hiddenWorkspaceIds.has(workspaceId)
+    })
+  }, [list, hiddenWorkspaceIds, ungroupedVisible, storedWorkspaces])
   const orderedWorkspaces = useMemo(() => workspaces.map((workspace) => {
     const memberIds = workspace.sessionIds
     const baseOrder = orderBy === 'updated'
@@ -1459,7 +1478,7 @@ export function WorkspaceBrowser({
                 rowState={rowState}
                 onLeaveArchivedOnly={leaveArchivedOnly}
                 workspaceReady={workspaceReady}
-                animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}`}
+                animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}/${hiddenWorkspaceIds.size}/${String(ungroupedVisible)}`}
                 useSessionStatus={useSessionStatus}
                 open={guardedOpen}
                 onSessionRenameRequest={requestSessionRename}
@@ -1487,6 +1506,8 @@ export function WorkspaceBrowser({
                 renderFactorySlot={renderFactorySlot} useContextMenu={useContextMenu}
                 useContextMenuTarget={useContextMenuTarget}
                 workspaces={orderedWorkspaces}
+                hiddenWorkspaceIds={hiddenWorkspaceIds}
+                ungroupedVisible={ungroupedVisible}
                 ungroupedSessionIds={orderedUngroupedSessionIds}
                 workspaceReady={workspaceReady}
                 nestWorkspaces={groupBy === 'workspace-tree'}
