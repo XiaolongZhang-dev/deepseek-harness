@@ -229,7 +229,7 @@ type ProjectRowItemProps = {
   /** Host account home; POSIX home-rooted hover paths display as `~`. */
   home?: string | undefined
   t: RowTranslate
-} & Pick<WorkspaceBrowserProps, 'useRemoteAccess' | 'useWorkspaceAccess' | 'renderFactorySlot' | 'useContextMenuTarget' | 'useContextMenu'>
+} & Pick<WorkspaceBrowserProps, 'useRemoteAccess' | 'useWorkspaceAccess' | 'renderFactorySlot' | 'renderSlot' | 'useContextMenuTarget' | 'useContextMenu'>
 
 /** Which of one header row's actions the caller's access snapshot allows. */
 interface ProjectRowAccess {
@@ -278,7 +278,7 @@ function WorkspaceProjectRow({ workspaceId, ...props }: ProjectRowItemProps & { 
 
 function ProjectRow({
   group, containsCurrentDescendant = false, onToggle, onCreate, drag: offeredDrag, home, newShortcut, t, access,
-  renderFactorySlot, useContextMenuTarget, useContextMenu,
+  renderFactorySlot, renderSlot, useContextMenuTarget, useContextMenu,
 }: ProjectRowItemProps & { access: ProjectRowAccess }) {
   const { getTriggerProps } = useContextMenu()
   const drag = access.reorder ? offeredDrag : undefined
@@ -318,6 +318,14 @@ function ProjectRow({
       <span className={css.projectText}>
         <span className={css.title}>{label}</span>
       </span>
+      {row.workspaceId !== undefined && (
+        <span className={css.rowTrailing}>
+          {renderSlot('sidebar.workspaces.workspace.row.trailing', {
+            workspaceId: row.workspaceId,
+            displayTitle: label,
+          })}
+        </span>
+      )}
       <span className={css.rowActions}>
         {workspaceMenuTarget !== undefined && (
           renderFactorySlot('contextMenu.button', {

@@ -33,6 +33,7 @@ const wid = (id: string) => id as WorkspaceId
 type RowSlotName =
   | 'sidebar.workspaces.session.menu.item'
   | 'sidebar.workspaces.session.row.action'
+  | 'sidebar.workspaces.workspace.row.trailing'
   | 'sidebar.session.row.trailing'
   | 'sidebar.session.row.leading'
   | 'sidebar.session.row.hover'
@@ -40,7 +41,7 @@ type RowRenderSlot = PropsRenderSlots<RowSlotName>['renderSlot']
 type SessionNodeItemProps = ComponentProps<typeof SessionNodeItemComponent>
 type ProjectRowItemProps = ComponentProps<typeof ProjectRowItemComponent>
 
-const renderNoRowEntries: RowRenderSlot = () => null
+const renderNoRowEntries: ProjectRowItemProps['renderSlot'] = () => null
 
 // Direct row specs use the real required Slot share, empty unless the case supplies entries.
 /**
@@ -65,12 +66,12 @@ function SessionNodeItem({ renderSlot = renderNoRowEntries, onRenameRequest = ()
 // Direct header specs hold every access answer unless the case refuses one.
 function ProjectRowItem({
   useRemoteAccess = allowAllAccess.useRemoteAccess, useWorkspaceAccess = allowAllAccess.useWorkspaceAccess,
-  renderFactorySlot = renderMenuButton, useContextMenuTarget = select => select(null), ...props
-}: Omit<ProjectRowItemProps, 'useRemoteAccess' | 'useWorkspaceAccess' | 'renderFactorySlot' | 'useContextMenuTarget' | 'useContextMenu'>
-  & Partial<Pick<ProjectRowItemProps, 'useRemoteAccess' | 'useWorkspaceAccess' | 'renderFactorySlot' | 'useContextMenuTarget' | 'useContextMenu'>>) {
+  renderFactorySlot = renderMenuButton, useContextMenuTarget = select => select(null), renderSlot = renderNoRowEntries, ...props
+}: Omit<ProjectRowItemProps, 'useRemoteAccess' | 'useWorkspaceAccess' | 'renderFactorySlot' | 'renderSlot' | 'useContextMenuTarget' | 'useContextMenu'>
+  & Partial<Pick<ProjectRowItemProps, 'useRemoteAccess' | 'useWorkspaceAccess' | 'renderFactorySlot' | 'renderSlot' | 'useContextMenuTarget' | 'useContextMenu'>>) {
   return <ProjectRowItemComponent {...props} useRemoteAccess={useRemoteAccess} useWorkspaceAccess={useWorkspaceAccess}
     useContextMenu={props.useContextMenu ?? contextMenuHook()} renderFactorySlot={renderFactorySlot}
-    useContextMenuTarget={useContextMenuTarget} />
+    renderSlot={renderSlot} useContextMenuTarget={useContextMenuTarget} />
 }
 
 /** Half detection reads the row rect; jsdom rects are all-zero by default. */

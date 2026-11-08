@@ -1,0 +1,15 @@
+/* The decoration stays one line and shrinks before the row's hover actions. */
+.row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.more {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 17px;
+  white-space: nowrap;
+}

@@ -1,0 +1,46 @@
+/* Dialog body spacing only; capsules and controls come from the primitives. */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 360px;
+}
+
+.label {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.empty {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 24px;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hint,
+.error {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.hint {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.error {
+  color: var(--dsw-alias-label-danger);
+}

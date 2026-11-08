@@ -30,6 +30,7 @@ import type {
 import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { ArchivedFilter, GroupNode, SessionNode, SessionOrderBy, SessionRowState } from '../tree.ts'
@@ -40,6 +41,7 @@ import {
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
 import { FLAT_SESSION_ORDER_KEY, type SessionGroupBy } from '../stores.ts'
 import { WorkspacePickFlow } from '../WorkspacePicker.tsx'
+import type { WorkspaceViewFilter } from '../contract/filters.ts'
 import css from './WorkspaceBrowser.module.css'
 
 /**
@@ -138,17 +140,64 @@ function useNativeDragAcceptance(active: boolean): void {
   }, [active])
 }
 
+/** Menu id for one registered-filter row; both parts are URL-encoded so ':' separates them safely. */
+const FILTER_MENU_PREFIX = 'workspace-view-filter:'
+
+/**
+ * Mint the menu id of one registered filter row.
+ * @param filterId - owning filter id.
+ * @param itemId - the filter's row id.
+ * @returns the menu id the View options menu dispatches with.
+ */
+function filterMenuId(filterId: string, itemId: string): string {
+  return `${FILTER_MENU_PREFIX}${encodeURIComponent(filterId)}:${encodeURIComponent(itemId)}`
+}
+
+/**
+ * Split a menu id minted by {@link filterMenuId}.
+ * @param id - the menu id the menu reported.
+ * @returns the owning filter and row, or undefined for any other menu id.
+ */
+function parseFilterMenuId(id: string): { filterId: string; itemId: string } | undefined {
+  if (!id.startsWith(FILTER_MENU_PREFIX)) return undefined
+  const [filterId, itemId] = id.slice(FILTER_MENU_PREFIX.length).split(':')
+  return filterId === undefined || itemId === undefined
+    ? undefined
+    : { filterId: decodeURIComponent(filterId), itemId: decodeURIComponent(itemId) }
+}
+
 /** Grouping, ordering, and archived-filter menu; own open state so it resets with the wide chrome. */
-function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrderPick, onArchivedFilterPick, t }: {
+function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, filters, onGroupPick, onOrderPick, onArchivedFilterPick, t }: {
   groupBy: SessionGroupBy
   orderBy: SessionOrderBy
   archivedFilter: ArchivedFilter
+  /** Registered plugin filters, in registry order. */
+  filters: readonly WorkspaceViewFilter[]
   onGroupPick: (mode: SessionGroupBy) => void
   onOrderPick: (mode: SessionOrderBy) => void
   onArchivedFilterPick: (filter: ArchivedFilter) => void
   t: WorkspaceBrowserProps['t']
 }) {
   const [open, setOpen] = useState(false)
+  // Each registered filter contributes a heading and rows; its selection state
+  // belongs to the filter owner, so the menu only maps ids back to callbacks.
+  const filterEntries = useMemo<MenuEntry[]>(() => filters.flatMap(filter => {
+    const rows = filter.items()
+    if (rows.length === 0) return []
+    return [
+      { type: 'separator', id: `filter-separator:${filter.id}` },
+      { type: 'label', id: `filter-label:${filter.id}`, text: filter.label },
+      ...rows.map(row => ({
+        id: filterMenuId(filter.id, row.id),
+        label: row.label,
+        ...(row.icon === undefined ? {} : { icon: row.icon }),
+        ...(row.disabled === undefined ? {} : { disabled: row.disabled }),
+      })),
+    ]
+  }), [filters])
+  const filterSelectedIds = useMemo(() => filters.flatMap(filter => filter.items()
+    .filter(row => row.selected === true)
+    .map(row => filterMenuId(filter.id, row.id))), [filters])
   return (
     <Menu
       open={open}
@@ -167,13 +216,23 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrde
         { id: 'hide-archived', label: t('viewOptions.hideArchived'), icon: <IconArchiveOffOutlineRegular /> },
         { id: 'show-archived', label: t('viewOptions.showArchived'), icon: <IconQueueOutlineRegular /> },
         { id: 'only-archived', label: t('viewOptions.onlyArchived'), icon: <IconArchiveCheckOutlineRegular /> },
+        ...filterEntries,
       ]}
       selectedIds={[
         groupBy,
         orderBy,
         { default: 'hide-archived', show: 'show-archived', only: 'only-archived' }[archivedFilter],
+        ...filterSelectedIds,
       ]}
       onSelect={(id) => {
+        const filterTarget = parseFilterMenuId(id)
+        if (filterTarget !== undefined) {
+          // A filter row flips multi-select state; keep the menu open so the
+          // next value can be picked without reopening it.
+          filters.find(filter => filter.id === filterTarget.filterId)
+            ?.items().find(row => row.id === filterTarget.itemId)?.onSelect()
+          return
+        }
         if (id === 'workspace' || id === 'workspace-tree' || id === 'flat') onGroupPick(id)
         else if (id === 'manual' || id === 'updated') onOrderPick(id)
         else if (id === 'hide-archived') onArchivedFilterPick('default')
@@ -555,6 +614,7 @@ function SessionTree({
           newShortcut={shortcuts.find(row => row.id === 'session.new')}
           group={group}
           renderFactorySlot={renderFactorySlot} useContextMenu={useContextMenu} useContextMenuTarget={useContextMenuTarget}
+          renderSlot={renderSlot}
           useRemoteAccess={useRemoteAccess}
           useWorkspaceAccess={useWorkspaceAccess}
           containsCurrentDescendant={currentAncestors.has(group.key)}
@@ -921,6 +981,7 @@ export function WorkspaceBrowser({
   useHostInfo,
   useShortcuts,
   useWorkspaceShortcuts,
+  useViewFilters,
   requestSearch,
   requestAddWorkspace,
   closeAddWorkspace,
@@ -933,18 +994,25 @@ export function WorkspaceBrowser({
   const searchShortcut = shortcuts.find(row => row.id === 'session.search')
   const addShortcut = shortcuts.find(row => row.id === 'workspace.add')
   const shortcutState = useWorkspaceShortcuts(state => state)
+  const viewFilters = useViewFilters(filters => filters)
   // Ordering remains live while the rail or search replaces the list body.
   const list = useSessions(state => state)
   const storedWorkspaces = useWorkspaces(state => state.items)
   // The resolved name, not `t`, is the memo dependency: the bound seat keeps
   // its identity across a language switch.
   const defaultWorkspaceName = t('workspace.defaultName')
+  // Every registered filter must accept a Workspace for it to stay visible;
+  // the ungrouped bucket has no Workspace and is never filtered.
+  const visibleWorkspaces = useMemo(
+    () => storedWorkspaces.filter(workspace => viewFilters.every(filter => filter.matches(workspace))),
+    [storedWorkspaces, viewFilters],
+  )
   const workspaces = useMemo(
-    () => storedWorkspaces.map(workspace => ({
+    () => visibleWorkspaces.map(workspace => ({
       ...workspace,
       title: workspaceDisplayTitle(workspace.title, defaultWorkspaceName),
     })),
-    [storedWorkspaces, defaultWorkspaceName],
+    [visibleWorkspaces, defaultWorkspaceName],
   )
   const workspacePhase = useWorkspaces(state => state.phase)
   const workspaceStreamState = useWorkspaces(state => state.state)
@@ -988,7 +1056,13 @@ export function WorkspaceBrowser({
     () => ({ ...orderState, archivedFilter }),
     [orderState, archivedFilter],
   )
-  const flatMemberIds = useMemo(() => sessionMemberIds(list), [list])
+  const flatMemberIds = useMemo(() => {
+    const memberIds = sessionMemberIds(list)
+    if (viewFilters.length === 0) return memberIds
+    const visible = new Set(visibleWorkspaces.flatMap(workspace => workspace.sessionIds))
+    const accounted = new Set(storedWorkspaces.flatMap(workspace => workspace.sessionIds))
+    return memberIds.filter(id => visible.has(id) || !accounted.has(id))
+  }, [list, viewFilters, visibleWorkspaces, storedWorkspaces])
   const orderedWorkspaces = useMemo(() => workspaces.map((workspace) => {
     const memberIds = workspace.sessionIds
     const baseOrder = orderBy === 'updated'
@@ -1030,9 +1104,9 @@ export function WorkspaceBrowser({
     actions.retainAccountKeys([
       UNGROUPED_KEY,
       FLAT_SESSION_ORDER_KEY,
-      ...workspaces.map(workspace => workspace.workspaceId),
+      ...storedWorkspaces.map(workspace => workspace.workspaceId),
     ])
-  }, [actions.retainAccountKeys, workspacePhase, workspaces])
+  }, [actions.retainAccountKeys, workspacePhase, storedWorkspaces])
   useEffect(() => {
     if (list.phase !== 'ready' || workspaceReady || orderBy !== 'manual' || currentBlank === undefined) return
     // A first prompt can end blank pinning before the Workspace baseline arrives.
@@ -1290,6 +1364,7 @@ export function WorkspaceBrowser({
               groupBy={groupBy}
               orderBy={orderBy}
               archivedFilter={archivedFilter}
+              filters={viewFilters}
               onGroupPick={actions.setGroupBy}
               onOrderPick={(mode) => { actions.setOrderBy(mode, activeSessionOrders) }}
               onArchivedFilterPick={actions.setArchivedFilter}

@@ -489,3 +489,14 @@
     transition: none;
   }
 }
+
+/* Registered Workspace row decoration (for example view tags): the cell stays
+   inline so the row keeps its height, and it shrinks before the hover actions. */
+.rowTrailing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+}

@@ -51,6 +51,7 @@ import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/cli
 import type { WorkspaceShortcutState } from '../shortcuts.ts'
 import type { StartSessionOptions } from '../navigation.ts'
 import type {} from './toast.ts'
+import type { WorkspaceViewFilter } from './filters.ts'
 import type { createWorkspaceViewStore } from '../stores.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-context-menu/client' {
@@ -84,6 +85,14 @@ export interface DirectoryFlowOwnerProps {
   onCancel: () => void
   /** The interaction itself failed (chooser missing, listing denied); the owner shows its error surface. */
   onError: (message: string) => void
+}
+
+/** Owner share of one Workspace row decoration seat: the row's Workspace and displayed title. */
+export interface WorkspaceRowOwnerProps {
+  /** Workspace this row shows; the ungrouped bucket has none and renders no seat. */
+  readonly workspaceId: WorkspaceId
+  /** Localized title the row displays. */
+  readonly displayTitle: string
 }
 
 /** Owner share of one Session row action occurrence: the row the action belongs to. */
@@ -210,6 +219,19 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * contribute the action to the menu list as well for touch access.
      */
     'sidebar.workspaces.session.row.action': { kind: 'list'; scope: 'root'; owner: SessionRowOwnerProps }
+    /**
+     * Trailing decoration of one real Workspace row, after its title and before
+     * the hover actions, in ascending `order`. ui-workspace renders the seat for
+     * every registered Workspace; the ungrouped bucket has no Workspace and
+     * renders none. Occupants own their data by Workspace id and must keep the
+     * row's height, hit targets, and drag behavior unchanged.
+     */
+    'sidebar.workspaces.workspace.row.trailing': {
+      kind: 'list'
+      scope: 'root'
+      inline: true
+      owner: WorkspaceRowOwnerProps
+    }
   }
 }
 
@@ -255,6 +277,8 @@ export type WorkspaceBrowserInjected = {
     hostInfo: HostObservable<RemoteHostFacts>
     workspaceShortcuts: HostObservable<WorkspaceShortcutState>
     shortcuts: HostObservable<readonly ShortcutCatalogEntry[]>
+    /** Registered view filters, ordered by their own `order` then id. */
+    viewFilters: HostObservable<readonly WorkspaceViewFilter[]>
   }
   /** Open the browser search and focus its input. */
   requestSearch: () => void
@@ -498,6 +522,7 @@ export type WorkspaceBrowserProps =
   & PropsRenderSlots<
     | 'sidebar.workspaces.directoryFlow'
     | 'sidebar.workspaces.session.row.action'
+    | 'sidebar.workspaces.workspace.row.trailing'
     | 'sidebar.session.row.trailing'
     | 'sidebar.session.row.leading'
     | 'sidebar.session.row.hover'

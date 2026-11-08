@@ -48,6 +48,7 @@ import {
 import { createWorkspaceShortcutControls, installWorkspaceShortcuts } from './shortcuts.ts'
 import { UiWorkspaceService } from './navigation.ts'
 import { createWorkspaceViewStore } from './stores.ts'
+import { WorkspaceViewFilters } from './contract/filters.ts'
 import { WorkspaceBrowser } from './rows/WorkspaceBrowser.tsx'
 import { ArchiveSessionRowButton, SessionArchiveConfirmDialog } from './session-actions/ArchiveSession.tsx'
 import { derive } from './session-actions/derived.ts'
@@ -68,6 +69,7 @@ export type {
   WorkspacePickerInjected, WorkspacePickerProps,
 } from './contract/slots.ts'
 export type { WorkspaceKey } from './locales.ts'
+export type { WorkspaceViewFilter, WorkspaceViewFilterItem } from './contract/filters.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface GlobalStandardProps {
@@ -119,6 +121,9 @@ export function apply(ctx: Context): void {
   const viewHandle = createWorkspaceViewStore()
   const viewInstance = viewHandle.create()
   const viewStore: typeof viewHandle = { ...viewHandle, create: () => viewInstance }
+  // Registry of plugin-contributed Workspace view filters; the browser renders
+  // their rows in the View options menu and applies their predicates.
+  const viewFilters = new WorkspaceViewFilters(ctx)
   const rowToast = createSnapshotStore<RowToastState | null>(null)
   let toastSeq = 0
   const notify = (toast: RowToast): void => { rowToast.set({ ...toast, seq: ++toastSeq }) }
@@ -309,7 +314,7 @@ export function apply(ctx: Context): void {
     closeAddWorkspace: shortcutControls.closeAdd,
     setDirectoryBusy: shortcutControls.directoryBusy,
     hooks: { workspaceActionRequest, contextMenuTarget: ctx.contextMenus.active, directoryFlow: browserFlowSource, hostInfo,
-      workspaceShortcuts: shortcutControls.state, shortcuts: ctx.shortcuts.catalog },
+      workspaceShortcuts: shortcutControls.state, shortcuts: ctx.shortcuts.catalog, viewFilters: viewFilters.source },
   })
   const pickerInjected = (): WorkspacePickerInjected => ({
     createWorkspace: input => workspaces.create(input),
@@ -326,6 +331,7 @@ export function apply(ctx: Context): void {
         'sidebar.session.row.leading': { kind: 'list', scope: 'root', inline: true },
         'sidebar.session.row.trailing': { kind: 'list', scope: 'root', inline: true },
         'sidebar.session.row.hover': { kind: 'list', scope: 'root' },
+        'sidebar.workspaces.workspace.row.trailing': { kind: 'list', scope: 'root', inline: true },
       },
       store: viewStore,
       inject: browserInjected,
