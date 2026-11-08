@@ -3,21 +3,45 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 420px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* A long vocabulary scrolls inside the card instead of growing past the viewport. */
+.list {
+  display: flex;
+  flex-direction: column;
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
 .row {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 32px;
+  min-height: 40px;
 }
 
-.row > :first-child {
-  margin-right: auto;
+/* The tag absorbs the slack so the count and actions never get pushed out. */
+.tagCell {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.row > button {
+  flex: none;
+}
+
+.renameInput {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .count {
+  flex: none;
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
   line-height: 18px;

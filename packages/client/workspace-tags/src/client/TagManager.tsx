@@ -13,6 +13,7 @@ import { NS } from './locales.ts'
 import type { TagManagerInjected } from './slots.ts'
 import type { WorkspaceTagsState } from './state.ts'
 import css from './TagManager.module.css'
+import dialogCss from './dialog.module.css'
 
 /** Full props of the tag manager overlay entry. */
 export type TagManagerDialogProps =
@@ -106,6 +107,7 @@ function ManagerBody({ state, close, save, t }: {
     <Modal
       open
       onClose={close}
+      className={dialogCss.wide ?? ''}
       title={t('manager.title')}
       description={t('manager.hint')}
       closeLabel={t('editor.close')}
@@ -114,56 +116,61 @@ function ManagerBody({ state, close, save, t }: {
       <div className={css.body}>
         {vocabulary.length === 0
           ? <span className={css.empty}>{t('manager.empty')}</span>
-          : vocabulary.map(tag => (
-            <div key={tag} className={css.row}>
-              {editing === tag
-                ? (
-                  <>
-                    <Input
-                      value={draft}
-                      aria-label={t('manager.rename')}
-                      onChange={(event) => { setDraft(event.target.value); setError(null) }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') { event.preventDefault(); rename(tag) }
-                        if (event.key === 'Escape') { setEditing(null); setError(null) }
-                      }}
-                      data-modal-autofocus
-                    />
-                    <Button size="sm" variant="primary" disabled={saving} onClick={() => { rename(tag) }}>{t('editor.save')}</Button>
-                    <Button size="sm" variant="ghost" onClick={() => { setEditing(null); setError(null) }}>{t('manager.cancel')}</Button>
-                  </>
-                )
-                : (
-                  <>
-                    <Pill>{tag}</Pill>
-                    <span className={css.count}>{t('manager.count', { count: countOf(state.assignments, tag) })}</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => { setEditing(tag); setDraft(tag); setPendingDelete(null); setError(null) }}
-                    >
-                      {t('manager.rename')}
-                    </Button>
-                    {pendingDelete === tag
-                      ? (
-                        <>
-                          <Button size="sm" variant="outline" disabled={saving} onClick={() => { remove(tag) }}>{t('manager.confirm')}</Button>
-                          <Button size="sm" variant="ghost" onClick={() => { setPendingDelete(null) }}>{t('manager.cancel')}</Button>
-                        </>
-                      )
-                      : (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => { setPendingDelete(tag); setEditing(null); setError(null) }}
-                        >
-                          {t('manager.delete')}
-                        </Button>
-                      )}
-                  </>
-                )}
+          : (
+            <div className={css.list}>
+              {vocabulary.map(tag => (
+              <div key={tag} className={css.row}>
+                {editing === tag
+                  ? (
+                    <>
+                      <Input
+                        className={css.renameInput ?? ''}
+                        value={draft}
+                        aria-label={t('manager.rename')}
+                        onChange={(event) => { setDraft(event.target.value); setError(null) }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') { event.preventDefault(); rename(tag) }
+                          if (event.key === 'Escape') { setEditing(null); setError(null) }
+                        }}
+                        data-modal-autofocus
+                      />
+                      <Button size="sm" variant="primary" disabled={saving} onClick={() => { rename(tag) }}>{t('editor.save')}</Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setEditing(null); setError(null) }}>{t('manager.cancel')}</Button>
+                    </>
+                  )
+                  : (
+                    <>
+                      <span className={css.tagCell}><Pill>{tag}</Pill></span>
+                      <span className={css.count}>{t('manager.count', { count: countOf(state.assignments, tag) })}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => { setEditing(tag); setDraft(tag); setPendingDelete(null); setError(null) }}
+                      >
+                        {t('manager.rename')}
+                      </Button>
+                      {pendingDelete === tag
+                        ? (
+                          <>
+                            <Button size="sm" variant="outline" disabled={saving} onClick={() => { remove(tag) }}>{t('manager.confirm')}</Button>
+                            <Button size="sm" variant="ghost" onClick={() => { setPendingDelete(null) }}>{t('manager.cancel')}</Button>
+                          </>
+                        )
+                        : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => { setPendingDelete(tag); setEditing(null); setError(null) }}
+                          >
+                            {t('manager.delete')}
+                          </Button>
+                        )}
+                    </>
+                  )}
+              </div>
+              ))}
             </div>
-          ))}
+          )}
         {error !== null && <div className={css.error}>{error}</div>}
       </div>
     </Modal>

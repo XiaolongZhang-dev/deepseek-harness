@@ -1,0 +1,7 @@
+/* Modal's dialog keeps `width: min(380px, 100%)`; this plugin's dialogs carry
+   a tag list plus row actions that need more room. The doubled class raises
+   specificity above Modal's `.dialog` rule without an `!important`, and the
+   card still caps itself at the viewport width. */
+.wide.wide {
+  width: min(560px, 100%);
+}

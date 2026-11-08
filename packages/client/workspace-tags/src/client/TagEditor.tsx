@@ -16,6 +16,7 @@ import { NS } from './locales.ts'
 import type { TagEditorInjected } from './slots.ts'
 import type { TagEditorRequest, WorkspaceTagsState } from './state.ts'
 import css from './TagEditor.module.css'
+import dialogCss from './dialog.module.css'
 
 /** Full props of the tag editor overlay entry. */
 export type TagEditorDialogProps =
@@ -110,6 +111,7 @@ function TagEditorForm({ request, state, close, save, t }: {
     <Modal
       open
       onClose={close}
+      className={dialogCss.wide ?? ''}
       title={t('editor.title')}
       description={request.displayTitle}
       closeLabel={t('editor.close')}
