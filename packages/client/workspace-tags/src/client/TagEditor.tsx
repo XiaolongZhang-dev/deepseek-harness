@@ -55,6 +55,7 @@ function TagEditorForm({ request, state, close, save, t }: {
   const composingRef = useRef(false)
   const vocabulary = vocabularyOf(state.assignments)
   const suggestions = vocabulary.filter(tag => !draft.some(item => tagKey(item) === tagKey(tag)))
+  const atLimit = draft.length >= TAGS_PER_WORKSPACE_MAX
 
   const add = (raw: string): void => {
     const normalized = normalizeTagName(raw)
@@ -140,7 +141,7 @@ function TagEditorForm({ request, state, close, save, t }: {
             }}
             data-modal-autofocus
           />
-          <Button variant="outline" onClick={() => { add(input) }}>{t('editor.add')}</Button>
+          <Button variant="outline" disabled={atLimit} onClick={() => { add(input) }}>{t('editor.add')}</Button>
         </div>
         {suggestions.length > 0 && (
           <>

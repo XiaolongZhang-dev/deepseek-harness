@@ -18,6 +18,8 @@ export interface WorkspaceTagsState {
   readonly revision: number
   /** The Workspace whose editor is open, or null. */
   readonly editor: TagEditorRequest | null
+  /** Whether the global tag manager is open. */
+  readonly manager: boolean
   /** The last load or save failure; the next success clears it. */
   readonly failure: 'load' | 'save' | null
 }
@@ -28,6 +30,7 @@ export const EMPTY_TAGS_STATE: WorkspaceTagsState = {
   selected: [],
   revision: 0,
   editor: null,
+  manager: false,
   failure: null,
 }
 

@@ -15,7 +15,7 @@ import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 // Type-only: pulls the generated `remote.settings` namespace and `ctx.remote`.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
-import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { IWorkspaces, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 // Type-only: pulls `ctx.locale` and the `locale/change` event.
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls `ctx.contextMenus` and the Workspace target family.
@@ -28,13 +28,14 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { WorkspaceViewFilterItem } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import {
-  readAssignments, tagKey, vocabularyOf, WORKSPACE_TAGS_NAMESPACE,
+  pruneAssignments, readAssignments, tagKey, vocabularyOf, WORKSPACE_TAGS_NAMESPACE,
 } from '../tags-settings.ts'
 import { en, NS, zh, type WorkspaceTagsKey } from './locales.ts'
 import { TagEditorDialog } from './TagEditor.tsx'
+import { TagManagerDialog } from './TagManager.tsx'
 import { WorkspaceTagChips } from './WorkspaceTagChips.tsx'
-import type { TagEditorInjected, TagsInjected } from './slots.ts'
-import type { WorkspaceTagsState } from './state.ts'
+import type { TagEditorInjected, TagManagerInjected, TagsInjected } from './slots.ts'
+import { EMPTY_TAGS_STATE, type WorkspaceTagsState } from './state.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -44,7 +45,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 /** Services these contributions read; the seams come from ui-workspace and the shell. */
-export const inject = ['slots', 'locale', 'contextMenus', 'remote', 'remote.settings', 'workspaceViewFilters']
+export const inject = ['slots', 'locale', 'contextMenus', 'remote', 'remote.settings', 'workspaces', 'workspaceViewFilters']
 
 /**
  * Contribute the Workspace tag surfaces and keep the local mirror current.
@@ -53,11 +54,22 @@ export const inject = ['slots', 'locale', 'contextMenus', 'remote', 'remote.sett
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'workspace-tags: dictionaries')
   const t = ctx.locale.bind(NS)
-  const store = createSnapshotStore<WorkspaceTagsState>({
-    assignments: {}, selected: [], revision: 0, editor: null, failure: null,
-  })
+  const store = createSnapshotStore<WorkspaceTagsState>(EMPTY_TAGS_STATE)
   const update = (patch: Partial<WorkspaceTagsState>): void => {
     store.set({ ...store.getSnapshot(), ...patch })
+  }
+  const workspaces = ctx.workspaces as IWorkspaces
+
+  /**
+   * The registry's authoritative Workspace ids while it is ready. A registry
+   * that has not finished loading reports nothing, so callers keep the stored
+   * assignments intact instead of pruning them away.
+   * @returns known ids, or undefined while the registry is not authoritative.
+   */
+  const knownWorkspaceIds = (): ReadonlySet<string> | undefined => {
+    const snapshot = workspaces.list.getSnapshot()
+    if (snapshot.phase !== 'ready') return undefined
+    return new Set(snapshot.items.map(row => String(row.workspaceId)))
   }
 
   /** Re-read the Host document; a failed read keeps the previous mirror. */
@@ -66,20 +78,22 @@ export function apply(ctx: ClientContext): void {
       const view = await ctx.remote.settings.describe()
       if (!view.ok) throw new Error(view.error.message)
       const namespace = view.value.namespaces.find(row => row.ns === WORKSPACE_TAGS_NAMESPACE)
-      update({ assignments: readAssignments(namespace?.value), revision: namespace?.revision ?? 0, failure: null })
+      const stored = readAssignments(namespace?.value)
+      const known = knownWorkspaceIds()
+      update({
+        assignments: known === undefined ? stored : pruneAssignments(stored, known),
+        revision: namespace?.revision ?? 0,
+        failure: null,
+      })
     } catch (_error: unknown) {
       // The filter keeps narrowing on the last mirror; the next read retries.
       update({ failure: 'load' })
     }
   }
 
-  /** Persist one Workspace's complete tag list. */
-  const save = async (workspaceId: string, tags: readonly string[]): Promise<void> => {
+  /** Persist the complete assignment map and publish the new mirror. */
+  const persistAssignments = async (assignments: Record<string, string[]>): Promise<void> => {
     const current = store.getSnapshot()
-    const assignments: Record<string, string[]> = {}
-    for (const [id, names] of Object.entries(current.assignments)) assignments[id] = [...names]
-    if (tags.length === 0) delete assignments[workspaceId]
-    else assignments[workspaceId] = [...tags]
     const payload: Record<string, JsonValue> = assignments
     try {
       const result = await ctx.remote.settings.mutate(
@@ -94,6 +108,16 @@ export function apply(ctx: ClientContext): void {
     }
     update({ assignments, revision: current.revision + 1, failure: null })
     void refresh()
+  }
+
+  /** Persist one Workspace's complete tag list. */
+  const save = (workspaceId: string, tags: readonly string[]): Promise<void> => {
+    const current = store.getSnapshot()
+    const assignments: Record<string, string[]> = {}
+    for (const [id, names] of Object.entries(current.assignments)) assignments[id] = [...names]
+    if (tags.length === 0) delete assignments[workspaceId]
+    else assignments[workspaceId] = [...tags]
+    return persistAssignments(assignments)
   }
 
   /** Toggle one tag in the active filter. */
@@ -126,6 +150,7 @@ export function apply(ctx: ClientContext): void {
     if (state.selected.length > 0) {
       rows.push({ id: 'clear', label: t('filter.clear'), onSelect: () => { update({ selected: [] }) } })
     }
+    rows.push({ id: 'manage', label: t('filter.manage'), onSelect: () => { update({ manager: true }) } })
     return rows
   }
 
@@ -193,6 +218,17 @@ export function apply(ctx: ClientContext): void {
       save,
     }),
   }, TagEditorDialog))
+
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay',
+    id: 'workspace-tags.manager',
+    locale: NS,
+    inject: (): TagManagerInjected => ({
+      hooks: { tags: store },
+      close: () => { update({ manager: false }) },
+      save: persistAssignments,
+    }),
+  }, TagManagerDialog))
 
   void refresh()
 }

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import {
-  normalizeTagName, readAssignments, tagKey, vocabularyOf,
+  normalizeTagName, pruneAssignments, readAssignments, tagKey, vocabularyOf,
 } from '../src/tags-settings.ts'
 
 describe('tag names', () => {
@@ -26,6 +26,20 @@ describe('vocabulary', () => {
 
   it('deduplicates case variants', () => {
     expect(vocabularyOf({ a: ['UI'], b: ['ui'] })).toEqual(['UI'])
+  })
+})
+
+describe('pruneAssignments', () => {
+  it('drops entries for Workspaces the registry no longer holds', () => {
+    expect(pruneAssignments({ a: ['前端'], b: ['后端'] }, new Set(['a']))).toEqual({ a: ['前端'] })
+  })
+
+  it('keeps a copy so callers can mutate their own map', () => {
+    const original = { a: ['前端'] }
+    const pruned = pruneAssignments(original, new Set(['a']))
+    pruned.a ??= []
+    pruned.a.push('研究')
+    expect(original.a).toEqual(['前端'])
   })
 })
 

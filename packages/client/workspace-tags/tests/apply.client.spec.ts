@@ -59,6 +59,21 @@ async function mount() {
     open: vi.fn(),
     close: vi.fn(),
   } as never)
+  // A ready registry holding the Workspaces this test tags.
+  const known = { ids: ['w1', 'w2'] as string[] }
+  ctx.provide('workspaces', {
+    list: {
+      getSnapshot: () => ({
+        items: known.ids.map(id => ({ workspaceId: id })),
+        archivedSessionIds: [],
+        pinnedSessionIds: [],
+        state: 'idle',
+        phase: 'ready' as const,
+        error: null,
+      }),
+      subscribe: () => () => {},
+    },
+  } as never)
   const filters = new WorkspaceViewFilters(ctx)
   // The two seats this plugin fills, declared by ui-workspace and the shell in
   // a real composition; a root registration declares them for this test.
@@ -70,7 +85,7 @@ async function mount() {
     },
   } as never, () => null)
   await ctx.plugin({ inject, apply }).await()
-  return { ctx, filters, settings }
+  return { ctx, filters, settings, known }
 }
 
 /** The editor's injected face, the surface a save goes through. */
@@ -116,6 +131,39 @@ describe('workspace-tags browser plugin', () => {
     expect(current.matches({
       workspaceId: 'w2', path: '/w2', title: 'w2', sessionIds: [], createdAt: '0', updatedAt: '0',
     } as never)).toBe(false)
+  })
+
+  it('rewrites the whole map through the global tag manager', async () => {
+    const b = await mount()
+    await settled()
+    await editorFace(b.ctx).save('w1', ['前端'])
+    await settled()
+    const managerEntry = b.ctx.slots.entries('shell.overlay')
+      .find(candidate => candidate.options.id === 'workspace-tags.manager')
+    if (managerEntry === undefined || managerEntry.inject === undefined) throw new Error('the tag manager is not registered')
+    const manager: { save: (assignments: Record<string, string[]>) => Promise<void> } = managerEntry.inject() as never
+    await manager.save({ w1: ['frontend'], w2: ['frontend'] })
+    await settled()
+    expect(b.settings.state.assignments).toEqual({ w1: ['frontend'], w2: ['frontend'] })
+    const latest = b.filters.source.getSnapshot()[0]!
+    expect(latest.items().some(row => row.label === 'frontend')).toBe(true)
+  })
+
+  it('forgets tags of Workspaces the registry no longer holds', async () => {
+    const b = await mount()
+    await settled()
+    await editorFace(b.ctx).save('w1', ['前端'])
+    await settled()
+    expect(b.filters.source.getSnapshot()[0]!.items().some(row => row.label === '前端')).toBe(true)
+
+    // w1 disappears from the registry; the next write refreshes the mirror and
+    // prunes its assignment instead of keeping an orphan tag.
+    b.known.ids = ['w2']
+    await editorFace(b.ctx).save('w2', ['后端'])
+    await settled()
+    const latest = b.filters.source.getSnapshot()[0]!
+    expect(latest.items().some(row => row.label === '前端')).toBe(false)
+    expect(latest.items().some(row => row.label === '后端')).toBe(true)
   })
 
   it('persists the assignment map through the settings Remote', async () => {

@@ -64,6 +64,23 @@ export function vocabularyOf(assignments: WorkspaceTagAssignments): string[] {
 }
 
 /**
+ * Drop assignments whose Workspace no longer exists.
+ * @param assignments - durable assignment map.
+ * @param known - Workspace ids the registry currently holds.
+ * @returns a pruned copy, preserving each surviving tag list's order.
+ */
+export function pruneAssignments(
+  assignments: WorkspaceTagAssignments,
+  known: ReadonlySet<string>,
+): Record<string, string[]> {
+  const result: Record<string, string[]> = {}
+  for (const [workspaceId, tags] of Object.entries(assignments)) {
+    if (known.has(workspaceId)) result[workspaceId] = [...tags]
+  }
+  return result
+}
+
+/**
  * Read one stored settings value, dropping malformed entries.
  * @param value - raw settings value for this namespace.
  * @returns a well-formed assignment map.

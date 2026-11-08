@@ -38,8 +38,8 @@ export function WorkspaceTagChips({ workspaceId, displayTitle, useTags, t }: Wor
   const hidden = tags.length - shown.length
   const isHit = (tag: string): boolean => state.selected.some(item => tagKey(item) === tagKey(tag))
   return (
-    <Tooltip label={t('chips.aria', { name: displayTitle })} side="top" delayMs={500} portal>
-      <span className={css.row}>
+    <Tooltip label={tags.join(' · ')} side="top" delayMs={500} portal>
+      <span className={css.row} aria-label={t('chips.aria', { name: displayTitle })}>
         {shown.map(tag => <Tag key={tag} tone={isHit(tag) ? 'info' : 'neutral'}>{tag}</Tag>)}
         {hidden > 0 && <span className={css.more}>{`+${hidden}`}</span>}
       </span>
