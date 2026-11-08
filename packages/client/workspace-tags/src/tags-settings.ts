@@ -33,7 +33,8 @@ const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/u
  */
 export function normalizeTagName(raw: string): string | undefined {
   const trimmed = raw.trim()
-  if ([...trimmed].length === 0 || [...trimmed].length > TAG_NAME_MAX_LENGTH) return undefined
+  const length = Array.from(trimmed).length
+  if (length === 0 || length > TAG_NAME_MAX_LENGTH) return undefined
   if (CONTROL_CHARACTERS.test(trimmed)) return undefined
   return trimmed
 }

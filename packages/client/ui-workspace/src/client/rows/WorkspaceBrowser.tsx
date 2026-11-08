@@ -181,7 +181,7 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, filters, onGroupPic
   const [open, setOpen] = useState(false)
   // Each registered filter contributes a heading and rows; its selection state
   // belongs to the filter owner, so the menu only maps ids back to callbacks.
-  const filterEntries = useMemo<MenuEntry[]>(() => filters.flatMap(filter => {
+  const filterEntries = useMemo<MenuEntry[]>(() => filters.flatMap((filter) => {
     const rows = filter.items()
     if (rows.length === 0) return []
     return [

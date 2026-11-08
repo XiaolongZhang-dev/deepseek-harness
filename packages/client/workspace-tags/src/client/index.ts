@@ -15,7 +15,7 @@ import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 // Type-only: pulls the generated `remote.settings` namespace and `ctx.remote`.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
-import type { IWorkspaces, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 // Type-only: pulls `ctx.locale` and the `locale/change` event.
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls `ctx.contextMenus` and the Workspace target family.
@@ -58,7 +58,7 @@ export function apply(ctx: ClientContext): void {
   const update = (patch: Partial<WorkspaceTagsState>): void => {
     store.set({ ...store.getSnapshot(), ...patch })
   }
-  const workspaces = ctx.workspaces as IWorkspaces
+  const workspaces = ctx.workspaces
 
   /**
    * The registry's authoritative Workspace ids while it is ready. A registry
@@ -114,9 +114,11 @@ export function apply(ctx: ClientContext): void {
   const save = (workspaceId: string, tags: readonly string[]): Promise<void> => {
     const current = store.getSnapshot()
     const assignments: Record<string, string[]> = {}
-    for (const [id, names] of Object.entries(current.assignments)) assignments[id] = [...names]
-    if (tags.length === 0) delete assignments[workspaceId]
-    else assignments[workspaceId] = [...tags]
+    for (const [id, names] of Object.entries(current.assignments)) {
+      if (id === workspaceId) continue
+      assignments[id] = [...names]
+    }
+    if (tags.length > 0) assignments[workspaceId] = [...tags]
     return persistAssignments(assignments)
   }
 

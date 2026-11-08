@@ -273,15 +273,17 @@ describe('ui-settings-general apply', () => {
   it('reads availability from the shared mirror and follows its reconnect refresh', async ({ mock, start }) => {
     const { c } = await client(mock, start, true)
     const { controller } = actionInjectedOf(c)
-    // Boot reads the document twice: the mirror's own `ensure` at apply, then
-    // the `connection/reset` of the first connection. The action's load adds none.
-    expect(c.mock.log.calls('settings/describe')).toHaveLength(2)
+    // Boot reads the document once per consumer: the mirror's own `ensure` at
+    // apply, the `connection/reset` of the first connection, and the Workspace
+    // tag filter's apply-time read of its assignment map. The action's load
+    // adds none.
+    expect(c.mock.log.calls('settings/describe')).toHaveLength(3)
     await controller.load()
-    expect(c.mock.log.calls('settings/describe')).toHaveLength(2)
+    expect(c.mock.log.calls('settings/describe')).toHaveLength(3)
     expect(controller.store.getSnapshot().status).toBe('ready')
     c.connection.reconnect()
     await c.mock.streams.opened('$events', 2)
-    await vi.waitFor(() => { expect(c.mock.log.calls('settings/describe')).toHaveLength(3) })
+    await vi.waitFor(() => { expect(c.mock.log.calls('settings/describe')).toHaveLength(4) })
   })
 
   it('keeps Host preferences off-loopback and withholds only the native document action', async ({ mock, start }) => {
